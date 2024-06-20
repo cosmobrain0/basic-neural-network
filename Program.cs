@@ -52,7 +52,7 @@ for (int i=0; i<learningIterations; i++)
 			// then pick a random weight or bias
 			// then change it a little
 
-			int nodeIndex = (int)(generator.NextInt64() & 1);
+			int nodeIndex = (int)(generator.NextInt64() % 6);
 			int weightIndex = (int)(generator.NextInt64()%3);
 
 			// we can use it as a direct index as there are no hidden layers
@@ -68,11 +68,11 @@ for (int i=0; i<learningIterations; i++)
 				// then pick a random weight or bias
 				// then change it a little
 	
-				int nodeIndex = (int)(generator.NextInt64() & 1);
+				int nodeIndex = (int)(generator.NextInt64() % 6);
 				int weightIndex = (int)(generator.NextInt64()%3);
-	
+
 				// we can use it as a direct index as there are no hidden layers
-				Node node = networks[j + networks.Length/2].outputs[nodeIndex];
+				Node node = nodeIndex < 2 ? networks[j].hidden[0][nodeIndex] : nodeIndex < 4 ? networks[j].hidden[1][nodeIndex-2] : networks[j].outputs[nodeIndex-4];
 				float change = (generator.NextSingle()-0.5f) * learnRate; 
 				if (weightIndex == 2) node.bias += change;
 				else node.incomingWeights[weightIndex] += change;
