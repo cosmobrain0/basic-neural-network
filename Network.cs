@@ -4,6 +4,16 @@ public class NeuralNetwork
 	public Node[][] hidden;
 	public Node[] outputs;
 
+	public void Copy(NeuralNetwork other)
+	{
+		for (int x=0; x<hidden.Length; x++)
+		{
+			for (int y=0; y<hidden[x].Length; y++)
+				hidden[x][y].Copy(other.hidden[x][y]);
+		}
+		for (int i=0; i<outputs.Length; i++) outputs[i].Copy(other.outputs[i]);
+	}
+
 	public NeuralNetwork(int inputSize, int[] hiddenLayerSizes, int outputSize, Random generator = null, bool random = false)
 	{
 		Func<float, float> activation = x => 1 / (1 + (float)Math.Exp(-x));
@@ -151,6 +161,13 @@ public class Node
 	public float bias;
 	public float[] incomingWeights;
 	private Func<float, float> activation;
+
+	public void Copy(Node other)
+	{
+		bias = other.bias;
+		for (int i=0; i<incomingWeights.Length; i++) incomingWeights[i] = other.incomingWeights[i];
+		activation = other.activation;
+	}
 
 	public bool SetWeight(int i, float weight)
 	{

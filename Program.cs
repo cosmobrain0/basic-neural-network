@@ -1,12 +1,12 @@
 ﻿Random generator = new Random((int)(DateTime.Now.Ticks << 32 >> 32));
-Random[] generators = new Random[128];
+Random[] generators = new Random[256];
 for (int i=0; i<generators.Length; i++) generators[i] = new Random((int)(generator.NextInt64() << 32 >> 32));
 NeuralNetwork[] networks = new NeuralNetwork[10000];
 
 for (int i=0; i<networks.Length; i++)
-	networks[i] = new NeuralNetwork(2, new int[] {}, 2, generator, true);
+	networks[i] = new NeuralNetwork(2, new int[] { 2, 2 }, 2, generator, true);
 
-// trying to learn to differentiate between stuff below "y = 2x - 1"
+// trying to learn to differentiate between stuff below "y = x^2" and stuff above it
 Func<float[], float[]> idealOutputs = inputs => inputs[1] > inputs[0] ? new float[] { 1, 0 } : new float[] { 0, 1 };
 
 Func<float[]> randomDataPoint = () => new float[] { generator.NextSingle(), generator.NextSingle() };
@@ -29,7 +29,7 @@ for (int j=0; j<testCases.Length; j++)
 
 // (NeuralNetwork network, float cost)[] result = networks.Select(x => (x, 0.0)).ToArray();
 float[] costs = new float[networks.Length];
-const int learningIterations = 1000;
+const int learningIterations = 6000;
 for (int i=0; i<learningIterations; i++)
 {
 	if (i%10 == 0) Console.Write($"iteration {i+1} / {learningIterations}: ");
@@ -38,31 +38,15 @@ for (int i=0; i<learningIterations; i++)
 	Parallel.For(0, networks.Length, j => {
 		costs[j] = networks[j].AverageCost(testCases);
 	});
-	// for (int j=0; j<networks.Length; j++)
-	// {
-	// 	float cost = networks[j].AverageCost(testCases);
-	// 	costs[j] = cost;
-	// 	// int k;
-	// 	// for (k=j-1; k>=0; k--)
-	// 	// {
-	// 	// 	if (costs[k] > cost)
-	// 	// 	{
-	// 	// 		networks[k+1] = networks[k];
-	// 	// 		costs[k+1] = costs[k];
-	// 	// 	}
-	// 	// 	else break;
-	// 	// }
-	// 	// costs[k+1] >= cost
-	// 	// costs[k+1] = cost;
-	// 	// networks[k+1] = network;
-	// }
 	Array.Sort(costs, networks);
-	if (i%10 == 0) Console.WriteLine($"Minimum cost - {costs[0]}");
+	if (i%10 == 0) Console.WriteLine($"Minimum cost - {costs[0]} | Average cost - {costs.Sum() / costs.Length} | Maximum cost - {costs[costs.Length-1]}");
 
-	const float learnRate = 0.23f;
-	Parallel.For(networks.Length/3, networks.Length, j => {
+	const float learnRate = 0.45f;
+	Parallel.For(networks.Length/6, networks.Length/2 + networks.Length/6, j => {
 		Random generator = generators[j%generators.Length];
-		for (int k=0; k<4; k++)
+		if (j < networks.Length/2)
+			networks[j + networks.Length/2].Copy(networks[j]);
+		for (int k=0; k<2; k++)
 		{
 			// pick a random node
 			// then pick a random weight or bias
@@ -70,36 +54,40 @@ for (int i=0; i<learningIterations; i++)
 
 			int nodeIndex = (int)(generator.NextInt64() & 1);
 			int weightIndex = (int)(generator.NextInt64()%3);
-			// int nodeIndex = 1;
-			// int weightIndex = 1;
 
 			// we can use it as a direct index as there are no hidden layers
-			Node node = networks[j].outputs[nodeIndex];
+			Node node = nodeIndex < 2 ? networks[j].hidden[0][nodeIndex] : nodeIndex < 4 ? networks[j].hidden[1][nodeIndex-2] : networks[j].outputs[nodeIndex-4];
 			float change = (generator.NextSingle()-0.5f) * learnRate; 
-			// float change = 1f * learnRate;
 			if (weightIndex == 2) node.bias += change;
 			else node.incomingWeights[weightIndex] += change;
 		}
+		if (j < networks.Length/2)
+			for (int k=0; k<2; k++)
+			{
+				// pick a random node
+				// then pick a random weight or bias
+				// then change it a little
+	
+				int nodeIndex = (int)(generator.NextInt64() & 1);
+				int weightIndex = (int)(generator.NextInt64()%3);
+	
+				// we can use it as a direct index as there are no hidden layers
+				Node node = networks[j + networks.Length/2].outputs[nodeIndex];
+				float change = (generator.NextSingle()-0.5f) * learnRate; 
+				if (weightIndex == 2) node.bias += change;
+				else node.incomingWeights[weightIndex] += change;
+			}
 	});
-	// for (int j=networks.Length/10; j<networks.Length; j++)
-	// {
-	// 	const float learnRate = 0.5f;
-	// 	// pick a random node
-	// 	// then pick a random weight or bias
-	// 	// then change it a little
-	// 	int nodeIndex = (int)(generator.NextInt64() & 1);
-	// 	int weightIndex = (int)(generator.NextInt64()%3);
-	// 	// we can use it as a direct index as there are no hidden layers
-	// 	Node node = networks[j].outputs[nodeIndex];
-	// 	float change = (generator.NextSingle()-0.5f) * 2f * learnRate; 
-	// 	if (weightIndex == 2) node.bias += change;
-	// 	else node.incomingWeights[weightIndex] += change;
-	// }
 }
 
 // debug final info
+Console.WriteLine("DEBUG ===");
+Console.WriteLine($"Output 0 : {networks[0].outputs[0].incomingWeights[0]} | {networks[0].outputs[0].incomingWeights[1]} | bias: {networks[0].outputs[0].bias}");
+Console.WriteLine($"Output 1 : {networks[0].outputs[1].incomingWeights[0]} | {networks[0].outputs[1].incomingWeights[1]} | bias: {networks[0].outputs[1].bias}");
+Console.WriteLine("=========");
+
 float minCost = float.PositiveInfinity;
-(float[], float[])[] finalTestCases = new (float[], float[])[100];
+(float[], float[])[] finalTestCases = new (float[], float[])[10000];
 for (int j=0; j<finalTestCases.Length; j++)
 {
 	float[] inputs = randomDataPoint();
